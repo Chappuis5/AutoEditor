@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Selection</title>
+    <link rel="stylesheet" href="{% app 'static/video_selection.css' %}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+<body>
+    <div id="console-container">
+        <h2 id="part-details"></h2>
+        <video id="video-player" controls>
+            <!-- The video source will be inserted here dynamically -->
+        </video>
+        <div id="controls">
+            <button id="prev">Go Back</button>
+            <button id="dislike">Dislike</button>
+            <button id="like">Like</button>
+            <button id="next">Next</button>
+            <button id="proceed" disabled>Proceed to Next Part</button>
+        </div>
+    </div>
+    <div id="parts-left">
+        <!-- Remaining parts will be displayed here -->
+    </div>
+
+    <script>
+        var videos = JSON.parse('{{ videos|escapejs }}');
+        var currentIndex = 0;
+
+        function updateVideoPlayer() {
+            // Update the video player with the current video
+            $("#video-player").attr("src", videos[currentIndex].url);
+            // Update the part details
+            $("#part-details").text(/* part details */);
+            // Enable/disable the "proceed" button
+            checkProceedButton();
+        }
+
+        function checkProceedButton() {
+            // If enough videos have been liked, enable the "proceed" button
+            if (/* condition */) {
+                $("#proceed").prop("disabled", false);
+            } else {
+                $("#proceed").prop("disabled", true);
+            }
+        }
+
+        $(document).ready(function() {
+            updateVideoPlayer();
+
+            $("#next").click(function() {
+                currentIndex++;
+                if (currentIndex >= videos.length) {
+                    currentIndex = 0;
+                }
+                updateVideoPlayer();
+            });
+
+            $("#prev").click(function() {
+                currentIndex--;
+                if (currentIndex < 0) {
+                    currentIndex = videos.length - 1;
+                }
+                updateVideoPlayer();
+            });
+
+            $("#dislike").click(function() {
+                videos.splice(currentIndex, 1);  // Remove the disliked video
+                if (videos.length === 0) {
+                    // No more videos left
+                    alert("No more videos left");
+                } else {
+                    updateVideoPlayer();
+                }
+            });
+
+            $("#like").click(function() {
+                // Mark the video as liked
+                videos[currentIndex].liked = true;
+                // Proceed to the next video
+                $("#next").click();
+            });
+
+            $("#proceed").click(function() {
+                // Proceed to the next part
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Processing</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var checkProcessingStatus = setInterval(function() {
+                $.ajax({
+                    url: "{% url 'processing' %}",
+                    type: "GET",
+                    success: function(data) {
+                        if (data.redirect) {
+                            window.location.href = data.redirect;
+                            clearInterval(checkProcessingStatus);
+                        }
+                    },
+                    error: function(data) {
+                        console.error("An error occurred while checking the processing status.");
+                    }
+                });
+            }, 2000);
+        });
+    </script>
+</head>
+<body>
+    <h1>Processing...</h1>
+</body>
+</html>

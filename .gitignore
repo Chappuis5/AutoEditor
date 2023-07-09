@@ -1,0 +1,9 @@
+/env
+/dist
+/AutoEditor.egg-info
+/web_interface/app/uploads/*
+/web_interface/parts_keywords_times.json
+/.DS_Store
+/.idea
+**/__pycache__/
+

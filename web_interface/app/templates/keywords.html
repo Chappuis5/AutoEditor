@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select Keywords</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Select Keywords</h1>
+        <form id="keywordForm" action="{% url 'save_keywords' %}" method="post">
+            {% csrf_token %}
+            {% for part in parts_keywords_times %}
+                <div class="form-group">
+                    <label for="part{{ forloop.counter }}">Part: {{ part.part }}</label>
+                    <select multiple class="form-control keyword-select" id="part{{ forloop.counter }}" name="{{ part.part }}">
+                        {% for keyword in part.keywords %}
+                            <option>{{ keyword }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" class="form-control keyword-input" id="customKeyword{{ forloop.counter }}" name="customKeyword{{ forloop.counter }}" placeholder="Add a custom keyword">
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary" id="submitBtn">Begin scraping</button>
+        </form>
+    </div>
+
+    <script type="text/javascript">
+        document.getElementById('submitBtn').addEventListener('click', function(e) {
+            let hasSelection = true;
+            let keywordSelects = document.getElementsByClassName('keyword-select');
+            let keywordInputs = document.getElementsByClassName('keyword-input');
+            for (let i = 0; i < keywordSelects.length; i++) {
+                if (keywordSelects[i].selectedOptions.length === 0 && keywordInputs[i].value.trim() === '') {
+                    hasSelection = false;
+                    break;
+                }
+            }
+            if (!hasSelection) {
+                e.preventDefault();
+                alert('Please select at least one keyword for each part.');
+            }
+        });
+    </script>
+</body>
+</html>
