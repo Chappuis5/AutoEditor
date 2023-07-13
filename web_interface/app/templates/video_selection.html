@@ -2,7 +2,8 @@
 <html>
 <head>
     <title>Video Selection</title>
-    <link rel="stylesheet" href="{% app 'static/video_selection.css' %}">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'video_selection.css' %}">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
@@ -16,6 +17,7 @@
             <button id="dislike">Dislike</button>
             <button id="like">Like</button>
             <button id="next">Next</button>
+            <button id="undo">Undo</button>
             <button id="proceed" disabled>Proceed to Next Part</button>
         </div>
     </div>
@@ -24,25 +26,37 @@
     </div>
 
     <script>
-        var videos = JSON.parse('{{ videos|escapejs }}');
+        var videos = JSON.parse('{{ videos_json|escapejs }}');
         var currentIndex = 0;
+        var dislikedVideos = [];
 
         function updateVideoPlayer() {
             // Update the video player with the current video
             $("#video-player").attr("src", videos[currentIndex].url);
             // Update the part details
-            $("#part-details").text(/* part details */);
+            $("#part-details").text(videos[currentIndex].keyword);
             // Enable/disable the "proceed" button
             checkProceedButton();
         }
 
         function checkProceedButton() {
             // If enough videos have been liked, enable the "proceed" button
-            if (/* condition */) {
+            if (getLikedVideosCount() >= 3) {
                 $("#proceed").prop("disabled", false);
             } else {
                 $("#proceed").prop("disabled", true);
             }
+        }
+
+        function getLikedVideosCount() {
+            // Count the number of liked videos
+            var count = 0;
+            for (var i = 0; i < videos.length; i++) {
+                if (videos[i].liked) {
+                    count++;
+                }
+            }
+            return count;
         }
 
         $(document).ready(function() {
@@ -65,6 +79,7 @@
             });
 
             $("#dislike").click(function() {
+                dislikedVideos.push(videos[currentIndex]);
                 videos.splice(currentIndex, 1);  // Remove the disliked video
                 if (videos.length === 0) {
                     // No more videos left
@@ -79,6 +94,13 @@
                 videos[currentIndex].liked = true;
                 // Proceed to the next video
                 $("#next").click();
+            });
+
+            $("#undo").click(function() {
+                if (dislikedVideos.length > 0) {
+                    videos.splice(currentIndex, 0, dislikedVideos.pop());
+                    updateVideoPlayer();
+                }
             });
 
             $("#proceed").click(function() {

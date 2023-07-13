@@ -23,6 +23,24 @@ class Audio:
         # Update the file path to the converted WAV file
         self.file_path = wav_file_path
 
+    def convert_m4a_to_mp3(self):
+        # Check if the file is in m4a format
+        if not self.file_path.lower().endswith('.m4a'):
+            print("File is not in .m4a format")
+            return
+
+        # Load the m4a audio file
+        audio = AudioSegment.from_file(self.file_path, format='m4a')
+
+        # Change the file extension to mp3
+        mp3_file_path = self.file_path.rsplit('.', 1)[0] + '.mp3'
+
+        # Export the audio in mp3 format
+        audio.export(mp3_file_path, format='mp3')
+
+        # Update the file path to the converted mp3 file
+        self.file_path = mp3_file_path
+
     def transcribe(self):
         leopard = pvleopard.create(access_key="JHRxxr3akK4RilsSIOyULG8IMwwmbMQX6fLcTeB2yXgXSsDWcexbdA==", model_path="/Users/evanflament/Documents/Git-Projects/AutoEditor/AutoEditor/leopard_params_fr.pv")
 

@@ -11,13 +11,13 @@
             {% csrf_token %}
             {% for part in parts_keywords_times %}
                 <div class="form-group">
-                    <label for="part{{ forloop.counter }}">Part: {{ part.part }}</label>
-                    <select multiple class="form-control keyword-select" id="part{{ forloop.counter }}" name="{{ part.part }}">
+                    <label for="part{{ part.part }}">Part: {{ part.part }}</label>
+                    <select multiple class="form-control keyword-select" id="part{{ part.part }}" name="{{ part.part }}">
                         {% for keyword in part.keywords %}
                             <option>{{ keyword }}</option>
                         {% endfor %}
                     </select>
-                    <input type="text" class="form-control keyword-input" id="customKeyword{{ forloop.counter }}" name="customKeyword{{ forloop.counter }}" placeholder="Add a custom keyword">
+                    <input type="text" class="form-control keyword-input" id="customKeyword{{ part.part }}" name="{{ part.part }}" placeholder="Add a custom keyword">
                 </div>
             {% endfor %}
             <button type="submit" class="btn btn-primary" id="submitBtn">Begin scraping</button>

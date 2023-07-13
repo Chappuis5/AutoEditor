@@ -50,9 +50,9 @@ def generate_keywords_gpt(part):
     return keywords
 
 
-def Helper(options, logger):
+def Helper(options, logger, open_ai_key):
     nltk.download('punkt')
-    openai.api_key = os.environ.get('OPENAI_API_KEY')
+    openai.api_key = open_ai_key
 
     # Lire le contenu du fichier du script vidéo
     with open(options["script_path"], "r") as script_file:
@@ -66,6 +66,7 @@ def Helper(options, logger):
     logger.write('Début de la transcription audio, veuillez patienter...', 'info')
 
     # Commencer la transcription
+    audioReader.convert_m4a_to_mp3()
     audioReader.transcribe()
 
     logger.write('Transcription audio terminée.', 'info')

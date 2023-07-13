@@ -14,6 +14,7 @@ setup(
         'simple-websocket',
         'pydub',
         'Django',
+        'python-dotenv',
     ],
     extras_require={
         'dev': [

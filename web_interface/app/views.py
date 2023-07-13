@@ -3,14 +3,30 @@ from django.core.files.storage import FileSystemStorage
 from threading import Thread
 from AutoEditor.Brain.brain import Helper
 from AutoEditor.Logger.logger import Logger
+from AutoEditor.Scraper.scraper import get_videos_for_keywords
 import json
 from django.http import HttpResponse, JsonResponse
 import os
 
+
 logger = Logger('AutoEditor.log')
 
 
+def load_api_keys(config_file):
+    try:
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+        return config
+    except FileNotFoundError:
+        logger.write('Fichier de configuration non trouvé. Veuillez le vérifier.', 'error')
+        return None
+
+
+config = load_api_keys('config.json')
+
+
 def index(request):
+
     logger.write('Accéder à l\'index.', 'info')
     if request.method == 'POST':
         logger.write('Formulaire POST reçu.', 'info')
@@ -33,19 +49,39 @@ def index(request):
 
 
 def video_selection(request):
-    if request.method == 'POST':
-        # Retrieve selected keywords from session
-        selected_keywords = request.session.get('selected_keywords')
+    logger.write('Accéder à la sélection de vidéos.', 'info')
 
-        # Retrieve videos matching the selected keywords
-        # (For now, we will assume that you have a function 'get_videos_for_keywords'
-        # that returns a list of video URLs for a given list of keywords.)
-        videos = get_videos_for_keywords(selected_keywords)
+    # Retrieve selected keywords from session
+    selected_keywords = request.session.get('selected_keywords', None)
 
-        return render(request, 'video_selection.html', {'videos': videos})
+    if not selected_keywords:
+        return redirect('index')  # Redirect to index if there's no selected keywords
 
-    return redirect('index')  # Redirect to index if not POST
+    logger.write(f'Keywords sélectionnés: {selected_keywords}', 'info')
 
+    # Read the JSON file and extract the videos
+    try:
+        with open('parts_keywords_times.json', 'r') as f:
+            parts_keywords_times = json.load(f)
+    except FileNotFoundError:
+        logger.write('Le fichier JSON n\'a pas été trouvé, rediriger vers index.', 'info')
+        return redirect('index')
+
+    # Combine all the videos from all parts into a single list
+    videos = []
+    for part in parts_keywords_times:
+        if 'videos' in part:
+            videos.extend(part['videos'])
+
+    logger.write(f'Vidéos récupérées pour les keywords: {videos}', 'info')
+
+    videos_json = json.dumps(videos)
+
+    context = {
+        'videos_json': videos_json,
+    }
+
+    return render(request, 'video_selection.html', context)
 
 def processing(request):
     logger.write('Accéder au processing.', 'info')
@@ -66,6 +102,8 @@ def processing(request):
 
 
 def run_transcription_script(audio_path, script_path):
+    open_ai_key = config['OPENAI_API_KEY']
+    logger.write(f'Open AI KEY used: {open_ai_key}', 'info')
     # Check if the JSON file exists and delete it before processing
     if os.path.isfile('parts_keywords_times.json'):
         os.remove('parts_keywords_times.json')
@@ -76,7 +114,7 @@ def run_transcription_script(audio_path, script_path):
         "script_path": script_path
     }
     logger.write('Début de la génération des Keywords...', 'info')
-    parts_keywords_times = Helper(options, logger)
+    parts_keywords_times = Helper(options, logger, open_ai_key)
     logger.write('Génération des Keywords terminée', 'info')
     with open('parts_keywords_times_temp.json', 'w') as f:
         json.dump(parts_keywords_times, f)
@@ -90,6 +128,7 @@ def keywords(request):
     try:
         with open('parts_keywords_times.json', 'r') as f:
             parts_keywords_times = json.load(f)
+        logger.write('Fichier JSON chargé avec succès.', 'info')
         return render(request, 'keywords.html', {'parts_keywords_times': parts_keywords_times})
     except FileNotFoundError:
         logger.write('Le fichier JSON n\'a pas été trouvé, rediriger vers index.', 'info')
@@ -97,23 +136,42 @@ def keywords(request):
 
 
 def save_keywords(request):
+    pexels_api_key = config['PEXELS_API_KEY']
+    pixabay_api_key = config['PIXABAY_API_KEY']
+    logger.write(f'PEXELS and PIXABAY API KEYS used: {pexels_api_key}, {pixabay_api_key}', 'info')
     logger.write('Sauvegarder les keywords.', 'info')
     if request.method == 'POST':
         selected_keywords = {}
         for part in request.POST.keys():
             if part != "csrfmiddlewaretoken":  # Ignore the csrf token
-                selected_keywords[part] = request.POST.getlist(part)  # Get the selected keywords for this part
+                if part.startswith('customKeyword'):  # This is a custom keyword
+                    custom_keyword = request.POST.get(part)
+                    if custom_keyword:  # Ignore if the field is empty
+                        part_name = part.replace('customKeyword', 'part')  # Get the corresponding part name
+                        if part_name not in selected_keywords:  # Create the list if it doesn't exist yet
+                            selected_keywords[part_name] = []
+                        selected_keywords[part_name].append(custom_keyword)  # Add the custom keyword to the list
+                else:
+                    selected_keywords[part] = request.POST.getlist(part)  # Get the selected keywords for this part
+
+        logger.write(f'Keywords sélectionnés: {selected_keywords}', 'info')
+        request.session['selected_keywords'] = selected_keywords  # Sauvegarde selected_keywords dans la session
+        logger.write(f'Sauvegardé selected_keywords dans la session: {selected_keywords}', 'info')  # Nouveau log
 
         # Update the JSON file with the new selected keywords
         with open('parts_keywords_times.json', 'r+') as f:
             parts_keywords_times = json.load(f)
 
             for part, keywords in selected_keywords.items():
-                for part_dict in parts_keywords_times:
-                    if part_dict['part'] == part:
-                        part_dict['keywords'] = keywords
-                        # Also add the videos for these keywords
-                        part_dict['videos'] = get_videos_for_keywords(keywords)
+                part_dict = next((item for item in parts_keywords_times if item["part"] == part), None)
+                if part_dict:
+                    part_dict['keywords'] = keywords
+                    # Also add the videos for these keywords
+                    part_dict['videos'] = get_videos_for_keywords(keywords, pexels_api_key, pixabay_api_key)
+                else:  # This is a new part, add it to the list
+                    part_dict = {"part": part, "keywords": keywords, "start_time": 0,
+                                 "end_time": 0, "videos": get_videos_for_keywords(keywords, pexels_api_key, pixabay_api_key)}
+                    parts_keywords_times.append(part_dict)
 
             f.seek(0)  # Move the cursor to the beginning of the file
             json.dump(parts_keywords_times, f)
@@ -121,18 +179,3 @@ def save_keywords(request):
 
         logger.write('Keywords sauvegardés.', 'info')
         return redirect('video_selection')  # Redirect to the video selection view
-
-
-def get_videos_for_part(request, part_name):
-    # Load the JSON file
-    with open('parts_keywords_times.json', 'r') as f:
-        parts_keywords_times = json.load(f)
-
-    # Find the part with the given name
-    for part in parts_keywords_times:
-        if part['part'] == part_name:
-            # Return the list of videos for this part
-            return JsonResponse({'videos': part['videos']})
-
-    # If no part was found with the given name, return an error
-    return JsonResponse({'error': 'Part not found'}, status=404)
