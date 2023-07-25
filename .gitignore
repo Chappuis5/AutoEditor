@@ -3,9 +3,11 @@
 /AutoEditor.egg-info
 /web_interface/uploads/*
 /web_interface/parts_keywords_times.json
-/.DS_Store
+**/.DS_Store
 /.idea
 **/__pycache__/
 /web_interface/config.json
 /web_interface/AutoEditor.log
 /.pytest_cache
+/web_interface/app/final_video/
+/web_interface/debug_directory/
