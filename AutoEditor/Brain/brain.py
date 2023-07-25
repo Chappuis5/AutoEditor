@@ -1,7 +1,6 @@
 from AutoEditor.audio_builder.audio_transcriber import Audio
 import openai
 import nltk
-import os
 
 
 def split_text_gpt(text, max_tokens_per_part):
@@ -82,18 +81,29 @@ def Helper(options, logger, open_ai_key):
     max_words_per_part = int(average_reading_speed * 10)
 
     # Utiliser GPT pour diviser le texte en parties
-    parts = split_text_gpt(video_script, max_words_per_part)  # Passer la limite de tokens à la fonction au lieu de max_words_per_part
+    parts = split_text_gpt(video_script, max_words_per_part)
 
     # Générer les mots clés pour chaque partie et calculer les temps de début et de fin de chaque partie
     parts_keywords_times = []
     total_parts = len(parts)
-    start_time = 0  # Initialize start_time with 0
+    part_transcriptions = []
+    transcription_index = 0
+
     for i, part in enumerate(parts):
-        # Générer les mots clés pour chaque partie et calculer les temps de début et de fin de chaque partie
+        # Générer les mots clés pour chaque partie
         keywords = generate_keywords_gpt(part)  # Générer les mots clés
 
-        # Calculer le temps de fin de la partie
-        end_time = start_time + len(part.split()) / average_reading_speed
+        part_transcriptions = []
+        part_word_count = 0
+        while transcription_index < len(transcriptions) and part_word_count < len(part.split()):
+            part_transcriptions.append(transcriptions[transcription_index])
+            part_word_count += len(transcriptions[transcription_index]['word'].split())
+            transcription_index += 1
+
+        # Calculer le temps de début et de fin de la partie
+        start_time = part_transcriptions[0]['start_time']
+        end_time = part_transcriptions[-1]['end_time'] + part_transcriptions[-1]['pause_after']
+
         # Calculate progress and emit progress update
         progress = int((i + 1) / total_parts * 100)
 
@@ -101,7 +111,9 @@ def Helper(options, logger, open_ai_key):
         part_dict = {"part": part, "keywords": keywords, "start_time": start_time, "end_time": end_time}
         parts_keywords_times.append(part_dict)
 
-        # Mise à jour du temps de début pour la partie suivante
-        start_time = end_time
+        # Réinitialiser les transcriptions de la partie pour la partie suivante
+        part_transcriptions = []
 
     return parts_keywords_times
+
+

@@ -15,6 +15,11 @@ setup(
         'pydub',
         'Django',
         'python-dotenv',
+        'moviepy',
+        'requests',
+        "pillow",
+        "numpy"
+
     ],
     extras_require={
         'dev': [

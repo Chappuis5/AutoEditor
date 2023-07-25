@@ -4,9 +4,11 @@ from threading import Thread
 from AutoEditor.Brain.brain import Helper
 from AutoEditor.Logger.logger import Logger
 from AutoEditor.Scraper.scraper import get_videos_for_keywords
+from AutoEditor.video_builder.video_editor import VideoEditor
 import json
 from django.http import HttpResponse, JsonResponse
 import os
+from django.views.decorators.csrf import csrf_exempt
 
 
 logger = Logger('AutoEditor.log')
@@ -38,6 +40,8 @@ def index(request):
         script_filename = fs.save(script_file.name, script_file)
 
         audio_path = fs.path(audio_filename)
+        # Store the audio path in the session
+        request.session['audio_path'] = audio_path
         script_path = fs.path(script_filename)
 
         logger.write('Début du traitement en arrière-plan.', 'info')
@@ -67,15 +71,26 @@ def video_selection(request):
         logger.write('Le fichier JSON n\'a pas été trouvé, rediriger vers index.', 'info')
         return redirect('index')
 
-    # Combine all the videos from all parts into a single list
-    videos = []
+    # Organize videos by part
+    videos_by_part = {}
     for part in parts_keywords_times:
         if 'videos' in part:
-            videos.extend(part['videos'])
+            # Calculate part duration
+            part_duration = part['end_time'] - part['start_time']
+            part_videos = []
+            for video in part['videos']:
+                # Include part and keyword information and part duration for each video
+                video_with_part_info = video.copy()
+                video_with_part_info['part'] = part['part']
+                video_with_part_info['keywords'] = part['keywords']
+                video_with_part_info['part_duration'] = part_duration
+                part_videos.append(video_with_part_info)
 
-    logger.write(f'Vidéos récupérées pour les keywords: {videos}', 'info')
+            videos_by_part[part['part']] = part_videos
 
-    videos_json = json.dumps(videos)
+    logger.write(f'Vidéos récupérées pour les keywords: {videos_by_part}', 'info')
+
+    videos_json = json.dumps(videos_by_part)
 
     context = {
         'videos_json': videos_json,
@@ -150,10 +165,11 @@ def save_keywords(request):
                         part_name = part.replace('customKeyword', 'part')  # Get the corresponding part name
                         if part_name not in selected_keywords:  # Create the list if it doesn't exist yet
                             selected_keywords[part_name] = []
-                        selected_keywords[part_name].append(custom_keyword)  # Add the custom keyword to the list
+                        if custom_keyword.strip():  # Check if the keyword is not an empty string
+                            selected_keywords[part_name].append(custom_keyword)  # Add the custom keyword to the list
                 else:
-                    selected_keywords[part] = request.POST.getlist(part)  # Get the selected keywords for this part
-
+                    selected_keywords[part] = [kw for kw in request.POST.getlist(part) if
+                                               kw.strip()]  # Get the selected keywords for this part, ignoring empty strings
         logger.write(f'Keywords sélectionnés: {selected_keywords}', 'info')
         request.session['selected_keywords'] = selected_keywords  # Sauvegarde selected_keywords dans la session
         logger.write(f'Sauvegardé selected_keywords dans la session: {selected_keywords}', 'info')  # Nouveau log
@@ -179,3 +195,33 @@ def save_keywords(request):
 
         logger.write('Keywords sauvegardés.', 'info')
         return redirect('video_selection')  # Redirect to the video selection view
+
+
+@csrf_exempt
+def save_liked_videos(request):
+    if request.method == 'POST':
+        liked_videos = json.loads(request.POST.get('liked_videos'))
+
+        # Dump the liked videos JSON for historical tracking
+        history_dir = os.path.join('debug_directory')  # Change 'debug_directory' to your desired directory
+        os.makedirs(history_dir, exist_ok=True)
+        with open(os.path.join(history_dir, 'liked_videos.json'), 'w') as f:
+            json.dump(liked_videos, f, indent=4)
+
+        # Create an instance of VideoEditor
+        video_editor = VideoEditor()
+
+        # Retrieve the audio path from the session
+        audio_path = request.session.get('audio_path')
+        if not audio_path:
+            # Handle the error
+            response_data = {
+                'message': 'Audio file not found.',
+            }
+            return JsonResponse(response_data, status=400)
+
+        video_editor.process_videos(liked_videos, audio_path)
+
+        return JsonResponse({'message': 'Liked videos saved and processed successfully.'})
+
+    return JsonResponse({'error': 'Invalid method.'})

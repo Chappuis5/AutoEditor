@@ -42,18 +42,22 @@ class Audio:
         self.file_path = mp3_file_path
 
     def transcribe(self):
-        leopard = pvleopard.create(access_key="JHRxxr3akK4RilsSIOyULG8IMwwmbMQX6fLcTeB2yXgXSsDWcexbdA==", model_path="/Users/evanflament/Documents/Git-Projects/AutoEditor/AutoEditor/leopard_params_fr.pv")
+        leopard = pvleopard.create(access_key="JHRxxr3akK4RilsSIOyULG8IMwwmbMQX6fLcTeB2yXgXSsDWcexbdA==",
+                                   model_path="/Users/evanflament/Documents/Git-Projects/"
+                                              "AutoEditor/AutoEditor/leopard_params_fr.pv")
 
         # Process the audio file
         transcript, words = leopard.process_file(self.file_path)
 
         # Convert the words to transcriptions format
-        for word in words:
+        for i, word in enumerate(words):
+            pause_after = words[i + 1].start_sec - word.end_sec if i + 1 < len(words) else 0
             self.transcriptions.append({
                 'word': word.word,
                 'start_time': word.start_sec,
                 'end_time': word.end_sec,
-                'confidence': word.confidence
+                'confidence': word.confidence,
+                'pause_after': pause_after
             })
 
     @property

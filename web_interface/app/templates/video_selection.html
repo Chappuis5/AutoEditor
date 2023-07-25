@@ -4,6 +4,32 @@
     <title>Video Selection</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'video_selection.css' %}">
+    <style>
+        /* Add simple rotating animation */
+        .loader {
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 16px solid blue;
+            border-right: 16px solid green;
+            border-bottom: 16px solid red;
+            border-left: 16px solid pink;
+            width: 120px;
+            height: 120px;
+            -webkit-animation: spin 2s linear infinite; /* Safari */
+            animation: spin 2s linear infinite;
+        }
+
+        /* Safari */
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
@@ -13,100 +39,235 @@
             <!-- The video source will be inserted here dynamically -->
         </video>
         <div id="controls">
-            <button id="prev">Go Back</button>
-            <button id="dislike">Dislike</button>
-            <button id="like">Like</button>
+            <button id="back" disabled>Go Back</button>
+            <button id="dislike">Dislike (←)</button>
+            <button id="like">Like (→)</button>
             <button id="next">Next</button>
             <button id="undo">Undo</button>
             <button id="proceed" disabled>Proceed to Next Part</button>
         </div>
+        <div id="counter">
+            <p id="total-counter">Total videos left to sort: </p>
+            <p id="part-counter">Videos left to sort for this part: </p>
+        </div>
     </div>
-    <div id="parts-left">
-        <!-- Remaining parts will be displayed here -->
+    <div id="liked-videos">
+        <!-- Liked videos will be displayed here -->
+    </div>
+    <div id="loader-container" style="display:none;">
+        <!-- This is where the loader will be displayed when all videos are sorted -->
+        <div class="loader"></div>
+        <p>Traitement en cours...</p>
     </div>
 
     <script>
-        var videos = JSON.parse('{{ videos_json|escapejs }}');
-        var currentIndex = 0;
+        var videosByPart = JSON.parse('{{ videos_json|escapejs }}');
+        var partKeys = Object.keys(videosByPart);
+        var currentPartIndex = 0;
+        var currentVideoIndex = 0;
         var dislikedVideos = [];
+        var likedVideos = [];
 
         function updateVideoPlayer() {
-            // Update the video player with the current video
-            $("#video-player").attr("src", videos[currentIndex].url);
-            // Update the part details
-            $("#part-details").text(videos[currentIndex].keyword);
-            // Enable/disable the "proceed" button
+            if(currentPartIndex < partKeys.length){
+                var currentPartKey = partKeys[currentPartIndex];
+                var currentVideo = videosByPart[currentPartKey][currentVideoIndex];
+                if(currentVideo.liked === undefined) currentVideo.liked = false; // Add this line
+                $("#video-player").attr("src", currentVideo.url);
+                $("#part-details").text("Keyword: " + currentVideo.keyword + " Partie: " + currentPartKey);
+                updateCounters();
+            }
             checkProceedButton();
         }
 
+
+        function updateCounters() {
+            var currentPartKey = partKeys[currentPartIndex];
+            var currentPartVideos = videosByPart[currentPartKey];
+            $("#total-counter").text("Total videos left to sort: " + getTotalVideosLeft());
+            $("#part-counter").text("Videos left to sort for this part: " + (currentPartVideos.length - currentVideoIndex));
+        }
+
+        function getTotalVideosLeft() {
+            var total = 0;
+            for(var i = currentPartIndex; i < partKeys.length; i++) {
+                var partKey = partKeys[i];
+                var partVideos = videosByPart[partKey];
+                total += partVideos.length - (i === currentPartIndex ? currentVideoIndex : 0);
+            }
+            return total;
+        }
+
         function checkProceedButton() {
-            // If enough videos have been liked, enable the "proceed" button
-            if (getLikedVideosCount() >= 3) {
-                $("#proceed").prop("disabled", false);
+            var currentPartKey = partKeys[currentPartIndex];
+            var currentPartVideos = videosByPart[currentPartKey];
+
+            // Check if there are more videos left in the current part
+            if (currentPartVideos && currentPartVideos.length > 0) {
+                var currentPartLikedVideosDuration = 0;
+                var currentPartDislikedVideosDuration = 0;
+
+                // Calculate total duration of liked and disliked videos
+                for (var i = 0; i < likedVideos.length; i++) {
+                    currentPartLikedVideosDuration += likedVideos[i].duration;
+                }
+                for (var i = 0; i < dislikedVideos.length; i++) {
+                    currentPartDislikedVideosDuration += dislikedVideos[i].duration;
+                }
+
+                // Check if the total duration of liked videos is less than the total duration of the part
+                if (currentPartLikedVideosDuration < currentPartVideos[0].part_duration) {
+                    $("#error-message").text("La durée totale des vidéos sélectionnées est inférieure à la durée de la partie. Veuillez aimer plus de vidéos.");
+                    $("#error-message").show();
+                    $("#proceed").prop("disabled", true);
+                } else if (currentPartDislikedVideosDuration === currentPartVideos[0].part_duration) {
+                    $("#error-message").text("Vous avez disliké toutes les vidéos de cette partie. Veuillez en aimer au moins une.");
+                    $("#error-message").show();
+                    $("#proceed").prop("disabled", true);
+                } else {
+                    $("#error-message").hide();
+                    $("#proceed").prop("disabled", false);
+                }
             } else {
+                // No more videos left in the current part, so disable the proceed button
                 $("#proceed").prop("disabled", true);
             }
         }
 
-        function getLikedVideosCount() {
-            // Count the number of liked videos
-            var count = 0;
-            for (var i = 0; i < videos.length; i++) {
-                if (videos[i].liked) {
-                    count++;
-                }
+        function handleDislike() {
+            var currentPartKey = partKeys[currentPartIndex];
+            dislikedVideos.push(videosByPart[currentPartKey][currentVideoIndex]);
+            currentVideoIndex++;
+            if (currentVideoIndex < videosByPart[currentPartKey].length) {
+                updateVideoPlayer();
+            } else if (currentPartIndex < partKeys.length - 1) {
+                currentPartIndex++;
+                currentVideoIndex = 0;
+                updateVideoPlayer();
             }
-            return count;
+            $("#back").prop("disabled", currentPartIndex === 0);
+        }
+
+        function handleLike() {
+            var currentPartKey = partKeys[currentPartIndex];
+            videosByPart[currentPartKey][currentVideoIndex].liked = true; // Add this line
+            likedVideos.push(videosByPart[currentPartKey][currentVideoIndex]);
+            currentVideoIndex++;
+            if (currentVideoIndex < videosByPart[currentPartKey].length) {
+                updateVideoPlayer();
+            } else if (currentPartIndex < partKeys.length - 1) {
+                currentPartIndex++;
+                currentVideoIndex = 0;
+                updateVideoPlayer();
+            }
+            updateLikedVideosDisplay();
+            $("#back").prop("disabled", currentPartIndex === 0);
         }
 
         $(document).ready(function() {
             updateVideoPlayer();
 
-            $("#next").click(function() {
-                currentIndex++;
-                if (currentIndex >= videos.length) {
-                    currentIndex = 0;
+            $(document).keydown(function(e) {
+                switch(e.which) {
+                    case 37: // Flèche gauche
+                        handleDislike();
+                        checkProceedButton();
+                        break;
+                    case 39: // Flèche droite
+                        handleLike();
+                        checkProceedButton();
+                        break;
+                    default: return;
                 }
-                updateVideoPlayer();
+                e.preventDefault();
             });
 
-            $("#prev").click(function() {
-                currentIndex--;
-                if (currentIndex < 0) {
-                    currentIndex = videos.length - 1;
+            $("#back").click(function() {
+                if (currentPartIndex > 0) {
+                    currentPartIndex--;
+                    currentVideoIndex = 0;
+                    updateVideoPlayer();
                 }
-                updateVideoPlayer();
+                if (currentPartIndex == 0) {
+                    $("#back").prop("disabled", true);
+                }
             });
 
             $("#dislike").click(function() {
-                dislikedVideos.push(videos[currentIndex]);
-                videos.splice(currentIndex, 1);  // Remove the disliked video
-                if (videos.length === 0) {
-                    // No more videos left
-                    alert("No more videos left");
-                } else {
-                    updateVideoPlayer();
-                }
+                handleDislike();
+                checkProceedButton();
             });
 
             $("#like").click(function() {
-                // Mark the video as liked
-                videos[currentIndex].liked = true;
-                // Proceed to the next video
-                $("#next").click();
+                handleLike();
+                checkProceedButton();
+            });
+
+            $("#next").click(function() {
+                currentVideoIndex++;
+                if (currentVideoIndex < videosByPart[partKeys[currentPartIndex]].length) {
+                    updateVideoPlayer();
+                }
             });
 
             $("#undo").click(function() {
                 if (dislikedVideos.length > 0) {
                     videos.splice(currentIndex, 0, dislikedVideos.pop());
                     updateVideoPlayer();
+                } else if (likedVideos.length > 0) {  // If no disliked video to undo, undo a like
+                    videos.splice(currentIndex, 0, likedVideos.pop());
+                    updateVideoPlayer();
                 }
             });
 
             $("#proceed").click(function() {
                 // Proceed to the next part
+                currentPartIndex++;
+                currentVideoIndex = 0;
+                updateVideoPlayer();
+                saveLikedVideos();
             });
         });
+        function saveLikedVideos() {
+            var likedVideosByPart = {};
+
+            // Go through each part
+            for(var partKey in videosByPart) {
+                // Filter out the videos that were not liked
+                likedVideosByPart[partKey] = videosByPart[partKey].filter(function(video) {
+                    return video.liked;
+                });
+            }
+
+            // Prepare the data to be sent to the server
+            var data = {
+                'liked_videos': JSON.stringify(likedVideosByPart),
+                'csrfmiddlewaretoken': '{{ csrf_token }}',
+            };
+
+            // Send the data to the server using AJAX
+            $.ajax({
+                url: '/save_liked_videos/', // Replace this with the URL to your Django view
+                method: 'POST',
+                data: data,
+                success: function(response) {
+                    console.log('Successfully saved liked videos.');
+                    // You could, for example, redirect the user or show a success message here
+                },
+                error: function(response) {
+                    console.log('Failed to save liked videos.');
+                    // You could, for example, show an error message to the user here
+                }
+            });
+        }
+        function updateLikedVideosDisplay() {
+            $("#liked-videos").empty();
+            for (var i = 0; i < likedVideos.length; i++) {
+                if (likedVideos[i].liked) {
+                    $("#liked-videos").append("<div>" + likedVideos[i].url + "</div>");
+                }
+            }
+        }
     </script>
 </body>
 </html>
