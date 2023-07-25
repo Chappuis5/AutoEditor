@@ -19,7 +19,6 @@ setup(
         'requests',
         "pillow",
         "numpy"
-
     ],
     extras_require={
         'dev': [

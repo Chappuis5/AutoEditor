@@ -52,18 +52,3 @@ def get_videos_for_keywords(keywords, pexels_api_key, pixabay_api_key):
         videos.extend(get_videos_from_pexels(keyword, pexels_api_key))
         videos.extend(get_videos_from_pixabay(keyword, pixabay_api_key))
     return videos
-
-
-def test_get_videos_for_keywords():
-    # Use two sample keywords
-    keywords = ['nature', 'city']
-
-    # Call the function
-    videos = get_videos_for_keywords(keywords)
-
-    # Check the result
-    for video in videos:
-        print(video)
-
-
-
