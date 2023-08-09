@@ -1,15 +1,24 @@
 from django.shortcuts import render, redirect
 from django.core.files.storage import FileSystemStorage
 from threading import Thread
-from AutoEditor.Brain.brain import Helper
-from AutoEditor.Logger.logger import Logger
-from AutoEditor.Scraper.scraper import get_videos_for_keywords
+#from AutoEditor.Brain.brain import Helper
+#old from AutoEditor.Logger.logger import Logger
+#old from AutoEditor.Scraper.scraper import get_videos_for_keywords
 import json
 from django.http import HttpResponse, JsonResponse
 import os
 
+from Brain.brain_gpt.gptbrain import GPTBrain
+from Logger.logger import Logger
+from Scraper.video_scraper.vid_scraper import get_videos_for_keywords
 
 logger = Logger('AutoEditor.log')
+gptBrain = GPTBrain("aaaa", logger)
+
+
+
+
+# old logger = Logger('AutoEditor.log')
 
 
 def load_api_keys(config_file):
@@ -109,12 +118,13 @@ def run_transcription_script(audio_path, script_path):
         os.remove('parts_keywords_times.json')
         logger.write('Ancien fichier JSON supprimé.', 'info')
 
-    options = {
-        "audio_path": audio_path,
-        "script_path": script_path
-    }
+    #options = {
+    #    "audio_path": audio_path,
+    #    "script_path": script_path
+    #}
     logger.write('Début de la génération des Keywords...', 'info')
-    parts_keywords_times = Helper(options, logger, open_ai_key)
+    #parts_keywords_times = Helper(options, logger, open_ai_key)
+    parts_keywords_times = gptBrain.calculate_parts_keywords_and_times(script_path, audio_path)
     logger.write('Génération des Keywords terminée', 'info')
     with open('parts_keywords_times_temp.json', 'w') as f:
         json.dump(parts_keywords_times, f)
