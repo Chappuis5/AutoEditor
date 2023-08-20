@@ -1,0 +1,10 @@
+tqdm
+pvleopard
+openai
+nltk
+pytest
+simple-websocket
+pydub
+Django
+python-dotenv
+git+https://github.com/Chappuis5/Editor.git#egg=Editor
