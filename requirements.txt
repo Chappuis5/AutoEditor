@@ -7,4 +7,5 @@ simple-websocket
 pydub
 Django
 python-dotenv
+pytube
 git+https://github.com/Chappuis5/Editor.git#egg=Editor

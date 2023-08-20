@@ -1,10 +1,10 @@
 from django.shortcuts import render, redirect
 from django.core.files.storage import FileSystemStorage
 from threading import Thread
-from AutoEditor.Brain.brain import Helper
-from AutoEditor.Logger.logger import Logger
-from AutoEditor.Scraper.scraper import get_videos_for_keywords
-from AutoEditor.video_builder.video_editor import VideoEditor
+from Brain.brain_gpt.gptbrain import Helper
+from Logger.logger import Logger
+from Scraper.video_scraper.vid_scraper import get_videos_for_keywords
+from Video.video_editor import VideoEditor
 import json
 from django.http import HttpResponse, JsonResponse
 import os
